@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>Motion Bed Control</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+*{box-sizing:border-box}body{margin:0;background:#f3f4f6;color:#111827}
+.wrap{max-width:560px;margin:auto;min-height:100vh;display:flex;align-items:center;padding:24px}
+.card{width:100%;background:#fff;border-radius:24px;padding:24px;box-shadow:0 10px 35px rgba(0,0,0,.08)}
+h1{font-size:32px;margin:0 0 8px}.status,.log{margin:16px 0;padding:13px 14px;background:#f9fafb;border-radius:14px}
+.log{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;max-height:220px;overflow:auto}
+button{width:100%;padding:18px 16px;margin-top:14px;border:0;border-radius:18px;font-size:21px;font-weight:700}
+#connect{background:#111827;color:#fff}#zero{background:#2563eb;color:#fff}#flat{background:#e5e7eb;color:#111827}
+button:disabled{opacity:.45}.small{font-size:12px;color:#6b7280}
+</style>
+</head>
+<body>
+<main class="wrap"><section class="card">
+<h1>Motion Bed</h1>
+<p>Bluetooth control for Zero G and Flat.</p>
+<div id="status" class="status">Ready</div>
+<button id="connect">Connect Bed</button>
+<button id="zero" disabled>Zero G</button>
+<button id="flat" disabled>Flat</button>
+<div id="log" class="log">Diagnostics ready.</div>
+<p class="small">Target: S4-Y-192-46380:60<br>BLE: FFE0 → FFE1</p>
+</section></main>
+
+<script>
+const TARGET_NAME = "S4-Y-192-46380:60";
+const SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
+const CHARACTERISTIC_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
+const ZERO_G_HEX = "FFFFFFFF05000000091706";
+const FLAT_HEX = "FFFFFFFF050000002A56DF";
+
+let device=null, characteristic=null;
+const statusEl=document.getElementById("status");
+const logEl=document.getElementById("log");
+const zeroBtn=document.getElementById("zero");
+const flatBtn=document.getElementById("flat");
+
+function log(msg){
+  const t=new Date().toLocaleTimeString();
+  logEl.textContent += "\n"+t+"  "+msg;
+  logEl.scrollTop=logEl.scrollHeight;
+}
+function errText(e){
+  if(!e) return "Unknown error";
+  return [e.name,e.message,String(e)].filter(Boolean).join(" | ");
+}
+function setStatus(s){statusEl.textContent=s;log(s);}
+function hexToBytes(hex){
+  let a=[]; for(let i=0;i<hex.length;i+=2) a.push(parseInt(hex.substr(i,2),16));
+  return new Uint8Array(a);
+}
+
+async function connectBed(){
+  try{
+    logEl.textContent="Starting diagnostics…";
+    log("navigator.bluetooth: "+(navigator.bluetooth ? "present" : "MISSING"));
+    if(!navigator.bluetooth) throw new Error("This browser does not expose Web Bluetooth.");
+
+    setStatus("Opening Bluetooth device picker…");
+
+    // Name filter is intentional: some iOS Web-Bluetooth wrappers have trouble
+    // matching 16-bit advertised service filters, even though GATT access works.
+    device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: TARGET_NAME }],
+      optionalServices: [SERVICE_UUID]
+    });
+
+    log("Selected device: "+(device.name || "(no name)"));
+    device.addEventListener("gattserverdisconnected", ()=>{
+      characteristic=null;
+      zeroBtn.disabled=true; flatBtn.disabled=true;
+      setStatus("Disconnected");
+    });
+
+    setStatus("Connecting GATT…");
+    const server=await device.gatt.connect();
+    log("GATT connected: "+server.connected);
+
+    setStatus("Getting FFE0 service…");
+    const service=await server.getPrimaryService(SERVICE_UUID);
+    log("FFE0 service found");
+
+    setStatus("Getting FFE1 characteristic…");
+    characteristic=await service.getCharacteristic(CHARACTERISTIC_UUID);
+    log("FFE1 found");
+    log("Properties: write="+!!characteristic.properties.write+
+        ", writeWithoutResponse="+!!characteristic.properties.writeWithoutResponse);
+
+    zeroBtn.disabled=false; flatBtn.disabled=false;
+    setStatus("Connected to "+(device.name || TARGET_NAME));
+  }catch(e){
+    console.error(e);
+    setStatus("Connect failed");
+    log("ERROR: "+errText(e));
+  }
+}
+
+async function send(hex,label){
+  try{
+    if(!characteristic) throw new Error("Connect Bed first.");
+    const bytes=hexToBytes(hex);
+    setStatus("Sending "+label+"…");
+    log("TX "+label+": "+hex);
+
+    if(characteristic.writeValueWithoutResponse){
+      try{
+        await characteristic.writeValueWithoutResponse(bytes);
+        log("Sent using writeValueWithoutResponse");
+      }catch(first){
+        log("withoutResponse failed: "+errText(first));
+        if(characteristic.writeValue){
+          await characteristic.writeValue(bytes);
+          log("Sent using writeValue fallback");
+        }else throw first;
+      }
+    }else if(characteristic.writeValue){
+      await characteristic.writeValue(bytes);
+      log("Sent using writeValue");
+    }else{
+      throw new Error("This browser exposes no characteristic write method.");
+    }
+    setStatus(label+" sent");
+  }catch(e){
+    console.error(e);
+    setStatus(label+" failed");
+    log("ERROR: "+errText(e));
+  }
+}
+
+document.getElementById("connect").onclick=connectBed;
+zeroBtn.onclick=()=>send(ZERO_G_HEX,"Zero G");
+flatBtn.onclick=()=>send(FLAT_HEX,"Flat");
+</script>
+</body>
+</html>
