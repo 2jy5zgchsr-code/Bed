@@ -1,0 +1,11 @@
+{
+  "name": "Motion Bed",
+  "short_name": "Motion Bed",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#eef2ef",
+  "theme_color": "#12312B",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

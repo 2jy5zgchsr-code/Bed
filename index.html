@@ -1,140 +1,359 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#111827" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>Motion Bed Control</title>
-  <link rel="manifest" href="manifest.webmanifest" />
-  <style>
-    :root { font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; }
-    * { box-sizing: border-box; }
-    body { margin:0; background:#f3f4f6; color:#111827; min-height:100vh; }
-    .wrap { max-width:560px; margin:0 auto; min-height:100vh; display:flex; flex-direction:column; justify-content:center; padding:24px; }
-    .card { background:#fff; border-radius:24px; padding:24px; box-shadow:0 10px 35px rgba(0,0,0,.08); }
-    h1 { margin:0 0 8px; font-size:32px; }
-    p { line-height:1.45; }
-    .status { margin:18px 0; padding:13px 14px; background:#f9fafb; border-radius:14px; font-size:14px; }
-    button { width:100%; padding:18px 16px; margin-top:14px; border:0; border-radius:18px; font-size:21px; font-weight:700; cursor:pointer; }
-    #connect { background:#111827; color:white; }
-    #zero { background:#2563eb; color:white; }
-    #flat { background:#e5e7eb; color:#111827; }
-    button:disabled { opacity:.45; cursor:not-allowed; }
-    .small { font-size:12px; color:#6b7280; margin-top:18px; }
-    code { word-break:break-all; }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<meta name="theme-color" content="#12312B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Motion Bed">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Motion Bed</title>
+<style>
+  :root{
+    --ink:#16211d;
+    --ink-soft:#4b5a54;
+    --paper:#eef2ef;
+    --card:#ffffff;
+    --line:#dde4e0;
+    --teal:#12463f;
+    --teal-strong:#0c332e;
+    --slate:#3f4f5c;
+    --slate-strong:#2c3944;
+    --amber:#a5461f;
+    --amber-bg:#fbe9e1;
+    --ok:#1d6e5e;
+    --ok-bg:#e2f2ec;
+    --radius:20px;
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #f4f7f4 0%, transparent 60%),
+      var(--paper);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:520px;
+    margin:0 auto;
+    min-height:100vh;
+    padding:calc(env(safe-area-inset-top,0px) + 20px) 18px calc(env(safe-area-inset-bottom,0px) + 24px);
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+
+  /* Header */
+  .eyebrow{
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    font-weight:600;
+    margin:0 0 2px;
+  }
+  h1{
+    font-size:30px;
+    line-height:1.1;
+    letter-spacing:-0.01em;
+    margin:0;
+    font-weight:750;
+  }
+
+  /* Status pill */
+  .status-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-top:6px;
+  }
+  .dot{
+    width:9px;height:9px;border-radius:50%;
+    background:var(--ink-soft);
+    flex:none;
+    transition:background .25s ease;
+  }
+  .dot.live{background:var(--ok);box-shadow:0 0 0 4px var(--ok-bg)}
+  .dot.busy{background:#b58a1e;box-shadow:0 0 0 4px #fbf1dd}
+  .dot.err{background:var(--amber);box-shadow:0 0 0 4px var(--amber-bg)}
+  #statusText{font-size:15px;color:var(--ink-soft);font-weight:500}
+
+  /* Bed illustration card */
+  .stage{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:22px 18px 16px;
+  }
+  .stage svg{width:100%;height:auto;display:block}
+  .seg{transition:transform .55s cubic-bezier(.4,0,.2,1)}
+  .position-label{
+    text-align:center;
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink-soft);
+    margin-top:6px;
+    letter-spacing:.02em;
+  }
+
+  /* Controls */
+  .controls{display:flex;flex-direction:column;gap:10px}
+  button.action{
+    appearance:none;
+    border:0;
+    border-radius:16px;
+    padding:18px 18px;
+    font-size:17px;
+    font-weight:650;
+    letter-spacing:-0.01em;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    transition:transform .12s ease, opacity .2s ease, box-shadow .2s ease;
+  }
+  button.action:active{transform:scale(.98)}
+  button.action:disabled{opacity:.4}
+  #connect{background:var(--ink);color:#fff}
+  #connect:not(:disabled):hover{background:#000}
+  #zero{background:var(--teal);color:#fff}
+  #flat{background:var(--slate);color:#fff}
+  .icon{width:20px;height:20px;flex:none}
+
+  /* Diagnostics disclosure */
+  details{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:16px;
+    overflow:hidden;
+  }
+  summary{
+    list-style:none;
+    cursor:pointer;
+    padding:14px 16px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--ink-soft);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  summary::-webkit-details-marker{display:none}
+  summary:after{content:"Show";font-weight:600;color:var(--ink-soft)}
+  details[open] summary:after{content:"Hide"}
+  .log{
+    font:12px ui-monospace,SFMono-Regular,Menlo,monospace;
+    white-space:pre-wrap;
+    max-height:200px;
+    overflow:auto;
+    padding:0 16px 16px;
+    color:var(--ink-soft);
+  }
+  .meta{
+    font-size:12px;
+    color:var(--ink-soft);
+    padding:0 16px 14px;
+    border-top:1px solid var(--line);
+    padding-top:10px;
+  }
+
+  footer{
+    text-align:center;
+    font-size:11px;
+    color:var(--ink-soft);
+    opacity:.7;
+    margin-top:4px;
+  }
+</style>
 </head>
 <body>
-  <main class="wrap">
-    <section class="card">
-      <h1>Motion Bed</h1>
-      <p>Bluetooth control for Zero G and Flat.</p>
+<main class="wrap">
 
-      <div id="status" class="status">Not connected</div>
+  <div>
+    <p class="eyebrow">Alivio Jannali · Bluetooth</p>
+    <h1>Motion Bed</h1>
+    <div class="status-row">
+      <span class="dot" id="dot"></span>
+      <span id="statusText">Not connected</span>
+    </div>
+  </div>
 
-      <button id="connect">Connect Bed</button>
-      <button id="zero" disabled>Zero G</button>
-      <button id="flat" disabled>Flat</button>
+  <section class="stage">
+    <svg id="bedSvg" viewBox="0 0 320 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- floor line -->
+      <line x1="20" y1="128" x2="300" y2="128" stroke="#dde4e0" stroke-width="2"/>
+      <!-- legs -->
+      <rect x="46" y="118" width="8" height="14" rx="2" fill="#c7d0ca"/>
+      <rect x="266" y="118" width="8" height="14" rx="2" fill="#c7d0ca"/>
+      <!-- base frame -->
+      <rect x="34" y="104" width="252" height="16" rx="6" fill="#3f4f5c"/>
 
-      <p class="small">
-        Target: <code>S4-Y-192-46380:60</code><br>
-        BLE: <code>FFE0 → FFE1</code>
-      </p>
-    </section>
-  </main>
+      <!-- leg (foot) section: hinge at x=214 -->
+      <g class="seg" id="legSeg" style="transform-origin:214px 104px">
+        <rect x="214" y="90" width="66" height="16" rx="6" fill="#12463f"/>
+      </g>
+
+      <!-- seat section: fixed -->
+      <rect x="140" y="90" width="76" height="16" rx="6" fill="#12463f"/>
+
+      <!-- back section: hinge at x=140 -->
+      <g class="seg" id="backSeg" style="transform-origin:140px 104px">
+        <rect x="70" y="90" width="72" height="16" rx="6" fill="#12463f"/>
+      </g>
+    </svg>
+    <p class="position-label" id="positionLabel">Position unknown</p>
+  </section>
+
+  <div class="controls">
+    <button class="action" id="connect">Connect Bed</button>
+    <button class="action" id="zero" disabled>Zero G</button>
+    <button class="action" id="flat" disabled>Flat</button>
+  </div>
+
+  <details id="diag">
+    <summary>Diagnostics</summary>
+    <div class="log" id="log">Diagnostics ready.</div>
+    <div class="meta">Target: S4-Y-192-46380:60 &nbsp;·&nbsp; BLE: FFE0 → FFE1</div>
+  </details>
+
+  <footer>Requires Bluefy (Web BLE Browser) or another Web-Bluetooth-capable browser.</footer>
+</main>
 
 <script>
-const SERVICE_UUID = 0xFFE0;
-const CHARACTERISTIC_UUID = 0xFFE1;
 const TARGET_NAME = "S4-Y-192-46380:60";
+const SERVICE_UUID = "0000ffe0-0000-1000-8000-00805f9b34fb";
+const CHARACTERISTIC_UUID = "0000ffe1-0000-1000-8000-00805f9b34fb";
 const ZERO_G_HEX = "FFFFFFFF05000000091706";
-const FLAT_HEX   = "FFFFFFFF050000002A56DF";
+const FLAT_HEX = "FFFFFFFF050000002A56DF";
 
-let device = null;
-let characteristic = null;
+let device=null, characteristic=null;
+const dotEl=document.getElementById("dot");
+const statusEl=document.getElementById("statusText");
+const logEl=document.getElementById("log");
+const zeroBtn=document.getElementById("zero");
+const flatBtn=document.getElementById("flat");
+const connectBtn=document.getElementById("connect");
+const legSeg=document.getElementById("legSeg");
+const backSeg=document.getElementById("backSeg");
+const posLabel=document.getElementById("positionLabel");
 
-const statusEl = document.getElementById("status");
-const connectBtn = document.getElementById("connect");
-const zeroBtn = document.getElementById("zero");
-const flatBtn = document.getElementById("flat");
-
-function setStatus(text) {
-  statusEl.textContent = text;
+function log(msg){
+  const t=new Date().toLocaleTimeString();
+  logEl.textContent += "\n"+t+"  "+msg;
+  logEl.scrollTop=logEl.scrollHeight;
 }
-
-function hexToBytes(hex) {
-  const clean = hex.replace(/\s+/g, "");
-  const bytes = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < clean.length; i += 2) {
-    bytes[i / 2] = parseInt(clean.slice(i, i + 2), 16);
+function errText(e){
+  if(!e) return "Unknown error";
+  return [e.name,e.message,String(e)].filter(Boolean).join(" | ");
+}
+function setStatus(s, mode){
+  statusEl.textContent=s;
+  dotEl.className="dot"+(mode?(" "+mode):"");
+  log(s);
+}
+function setPosition(pos){
+  if(pos==="zero"){
+    backSeg.style.transform="rotate(-26deg)";
+    legSeg.style.transform="rotate(-18deg)";
+    posLabel.textContent="Zero Gravity";
+  }else if(pos==="flat"){
+    backSeg.style.transform="rotate(0deg)";
+    legSeg.style.transform="rotate(0deg)";
+    posLabel.textContent="Flat";
+  }else{
+    posLabel.textContent="Position unknown";
   }
-  return bytes;
+}
+function hexToBytes(hex){
+  let a=[]; for(let i=0;i<hex.length;i+=2) a.push(parseInt(hex.substr(i,2),16));
+  return new Uint8Array(a);
 }
 
-async function connectBed() {
-  try {
-    if (!navigator.bluetooth) {
-      throw new Error("Web Bluetooth is not available in this browser.");
-    }
+async function connectBed(){
+  connectBtn.disabled=true;
+  try{
+    logEl.textContent="Starting diagnostics…";
+    log("navigator.bluetooth: "+(navigator.bluetooth ? "present" : "MISSING"));
+    if(!navigator.bluetooth) throw new Error("This browser does not expose Web Bluetooth. Open this page in Bluefy.");
 
-    setStatus("Choose the bed from the Bluetooth list…");
+    setStatus("Opening Bluetooth device picker…", "busy");
 
     device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [SERVICE_UUID] }],
+      filters: [{ name: TARGET_NAME }],
       optionalServices: [SERVICE_UUID]
     });
 
-    if (device.name && device.name !== TARGET_NAME) {
-      setStatus(`Connected device is ${device.name}; expected ${TARGET_NAME}.`);
-    }
-
-    device.addEventListener("gattserverdisconnected", () => {
-      characteristic = null;
-      zeroBtn.disabled = true;
-      flatBtn.disabled = true;
-      setStatus("Disconnected");
+    log("Selected device: "+(device.name || "(no name)"));
+    device.addEventListener("gattserverdisconnected", ()=>{
+      characteristic=null;
+      zeroBtn.disabled=true; flatBtn.disabled=true;
+      connectBtn.disabled=false;
+      setStatus("Disconnected", "err");
     });
 
-    setStatus(`Connecting to ${device.name || "bed"}…`);
-    const server = await device.gatt.connect();
+    setStatus("Connecting…", "busy");
+    const server=await device.gatt.connect();
+    log("GATT connected: "+server.connected);
 
-    const service = await server.getPrimaryService(SERVICE_UUID);
-    characteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
+    const service=await server.getPrimaryService(SERVICE_UUID);
+    log("FFE0 service found");
 
-    zeroBtn.disabled = false;
-    flatBtn.disabled = false;
-    setStatus(`Connected to ${device.name || "bed"}`);
-  } catch (err) {
-    console.error(err);
-    setStatus(`Error: ${err.message}`);
+    characteristic=await service.getCharacteristic(CHARACTERISTIC_UUID);
+    log("FFE1 found");
+    log("Properties: write="+!!characteristic.properties.write+
+        ", writeWithoutResponse="+!!characteristic.properties.writeWithoutResponse);
+
+    zeroBtn.disabled=false; flatBtn.disabled=false;
+    setStatus("Connected", "live");
+  }catch(e){
+    console.error(e);
+    setStatus("Connect failed", "err");
+    log("ERROR: "+errText(e));
+    connectBtn.disabled=false;
   }
 }
 
-async function sendCommand(hex, label) {
-  try {
-    if (!characteristic) throw new Error("Connect to the bed first.");
+async function send(hex,label,posKey){
+  try{
+    if(!characteristic) throw new Error("Connect Bed first.");
+    const bytes=hexToBytes(hex);
+    setStatus("Sending "+label+"…", "busy");
+    log("TX "+label+": "+hex);
 
-    const data = hexToBytes(hex);
-    setStatus(`Sending ${label}…`);
-
-    if (typeof characteristic.writeValueWithoutResponse === "function") {
-      await characteristic.writeValueWithoutResponse(data);
-    } else {
-      await characteristic.writeValue(data);
+    if(characteristic.writeValueWithoutResponse){
+      try{
+        await characteristic.writeValueWithoutResponse(bytes);
+        log("Sent using writeValueWithoutResponse");
+      }catch(first){
+        log("withoutResponse failed: "+errText(first));
+        if(characteristic.writeValue){
+          await characteristic.writeValue(bytes);
+          log("Sent using writeValue fallback");
+        }else throw first;
+      }
+    }else if(characteristic.writeValue){
+      await characteristic.writeValue(bytes);
+      log("Sent using writeValue");
+    }else{
+      throw new Error("This browser exposes no characteristic write method.");
     }
-
-    setStatus(`${label} sent`);
-  } catch (err) {
-    console.error(err);
-    setStatus(`Error: ${err.message}`);
+    setStatus(label+" sent", "live");
+    setPosition(posKey);
+  }catch(e){
+    console.error(e);
+    setStatus(label+" failed", "err");
+    log("ERROR: "+errText(e));
   }
 }
 
-connectBtn.addEventListener("click", connectBed);
-zeroBtn.addEventListener("click", () => sendCommand(ZERO_G_HEX, "Zero G"));
-flatBtn.addEventListener("click", () => sendCommand(FLAT_HEX, "Flat"));
+connectBtn.onclick=connectBed;
+zeroBtn.onclick=()=>send(ZERO_G_HEX,"Zero G","zero");
+flatBtn.onclick=()=>send(FLAT_HEX,"Flat","flat");
 </script>
 </body>
 </html>
